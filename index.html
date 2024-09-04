@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Realtime Messaging with Firebase</title>
+    <!-- Firebase App (the core Firebase SDK) -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <!-- Firebase Realtime Database SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+    <!-- Firebase Authentication SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+    <!-- Firebase Storage SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js"></script>
+</head>
+<body>
+    <h1>Realtime Messaging with Firebase</h1>
+
+    <!-- Registration and Login Forms -->
+    <div id="authSection">
+        <h2>Register</h2>
+        <input type="email" id="registerEmail" placeholder="Email"><br><br>
+        <input type="password" id="registerPassword" placeholder="Password"><br><br>
+        <button onclick="register()">Register</button><br><br>
+
+        <h2>Login</h2>
+        <input type="email" id="loginEmail" placeholder="Email"><br><br>
+        <input type="password" id="loginPassword" placeholder="Password"><br><br>
+        <button onclick="login()">Login</button><br><br>
+    </div>
+
+    <!-- Form to send message and upload image, visible only when logged in -->
+    <div id="messageSection" style="display:none;">
+        <textarea id="messageInput" placeholder="Enter your message..." rows="5" cols="30"></textarea><br><br>
+        <input type="file" id="imageInput" accept="image/*"><br><br>
+        <button onclick="sendMessage()">Send</button>
+        <button onclick="logout()">Logout</button>
+        <h2>Messages</h2>
+        <div id="messages"></div>
+    </div>
+
+    <script>
+        // Your web app's Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyBFLQzHxVw5UV1481iRfruD9AEenf_M_lI",
+            authDomain: "realtime-sync-project.firebaseapp.com",
+            databaseURL: "https://realtime-sync-project-default-rtdb.firebaseio.com",
+            projectId: "realtime-sync-project",
+            storageBucket: "realtime-sync-project.appspot.com",
+            messagingSenderId: "1079348282119",
+            appId: "1:1079348282119:web:57d72c95e6212070fe7ba2",
+            measurementId: "G-XKVNBVD6RE"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+        const storage = firebase.storage();
+        const auth = firebase.auth();
+
+        // Register new user
+        function register() {
+            const email = document.getElementById('registerEmail').value;
+            const password = document.getElementById('registerPassword').value;
+
+            auth.createUserWithEmailAndPassword(email, password)
+                .then(userCredential => {
+                    alert('Registration successful!');
+                    document.getElementById('registerEmail').value = '';
+                    document.getElementById('registerPassword').value = '';
+                })
+                .catch(error => {
+                    alert('Error: ' + error.message);
+                });
+        }
+
+        // Login existing user
+        function login() {
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+
+            auth.signInWithEmailAndPassword(email, password)
+                .then(userCredential => {
+                    document.getElementById('authSection').style.display = 'none';
+                    document.getElementById('messageSection').style.display = 'block';
+                    loadMessages(); // Load messages after login
+                })
+                .catch(error => {
+                    alert('Error: ' + error.message);
+                });
+        }
+
+        // Logout user
+        function logout() {
+            auth.signOut().then(() => {
+                document.getElementById('authSection').style.display = 'block';
+                document.getElementById('messageSection').style.display = 'none';
+            }).catch(error => {
+                alert('Error: ' + error.message);
+            });
+        }
+
+        // Send a message or image
+        function sendMessage() {
+            const userId = auth.currentUser.uid;
+            const message = document.getElementById('messageInput').value;
+            const imageInput = document.getElementById('imageInput');
+            const imageFile = imageInput.files[0];
+
+            if (imageFile) {
+                // Upload image to Firebase Storage
+                const storageRef = storage.ref('images/' + imageFile.name);
+                storageRef.put(imageFile).then((snapshot) => {
+                    // Get image URL after upload
+                    snapshot.ref.getDownloadURL().then((url) => {
+                        // Save message with image URL to the database
+                        messagesRef.push({
+                            userId: userId,
+                            message: message,
+                            imageUrl: url,
+                            timestamp: Date.now()
+                        });
+                    });
+                });
+            } else {
+                // Save message without image to the database
+                messagesRef.push({
+                    userId: userId,
+                    message: message,
+                    timestamp: Date.now()
+                });
+            }
+
+            // Clear the input fields
+            document.getElementById('messageInput').value = '';
+            document.getElementById('imageInput').value = '';
+        }
+
+        // Reference to the database path for messages
+        const messagesRef = database.ref('messages');
+
+        // Function to load and display messages in real-time
+        function loadMessages() {
+            messagesRef.on('value', (snapshot) => {
+                const messagesDiv = document.getElementById('messages');
+                messagesDiv.innerHTML = ''; // Clear previous messages
+
+                snapshot.forEach((childSnapshot) => {
+                    const childData = childSnapshot.val();
+
+                    // Create message element
+                    const messageElement = document.createElement('div');
+                    messageElement.style.marginBottom = '20px';
+
+                    if (childData.message) {
+                        const messageText = document.createElement('p');
+                        messageText.textContent = `User ${childData.userId}: ${childData.message}`;
+                        messageElement.appendChild(messageText);
+                    }
+
+                    if (childData.imageUrl) {
+                        const messageImage = document.createElement('img');
+                        messageImage.src = childData.imageUrl;
+                        messageImage.style.maxWidth = '200px';
+                        messageElement.appendChild(messageImage);
+                    }
+
+                    messagesDiv.appendChild(messageElement);
+                });
+            });
+        }
+
+        // Check for user authentication state changes
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                // User is signed in
+                document.getElementById('authSection').style.display = 'none';
+                document.getElementById('messageSection').style.display = 'block';
+                loadMessages(); // Load messages for logged-in users
+            } else {
+                // User is signed out
+                document.getElementById('authSection').style.display = 'block';
+                document.getElementById('messageSection').style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>
