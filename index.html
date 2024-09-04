@@ -3,7 +3,71 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Realtime Messaging with Firebase</title>
+    <title>Messaging with Firebase</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f4f4f9;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+        h1 {
+            color: #5a67d8;
+        }
+        #authSection, #messageSection {
+            width: 300px;
+            background: white;
+            padding: 20px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        input[type="email"], input[type="password"], input[type="text"], textarea {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: #5a67d8;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background-color: #434190;
+        }
+        #messages {
+            max-height: 300px;
+            overflow-y: auto;
+            text-align: left;
+        }
+        #messages div {
+            background: #e2e8f0;
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        img {
+            max-width: 100%;
+            border-radius: 5px;
+        }
+        #googleSignInBtn {
+            background-color: #db4437;
+            margin-top: 10px;
+        }
+    </style>
     <!-- Firebase App (the core Firebase SDK) -->
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <!-- Firebase Realtime Database SDK -->
@@ -12,27 +76,32 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
     <!-- Firebase Storage SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js"></script>
+    <!-- Firebase Firestore SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 </head>
 <body>
-    <h1>Realtime Messaging with Firebase</h1>
+    <h1>Messaging</h1>
 
     <!-- Registration and Login Forms -->
     <div id="authSection">
         <h2>Register</h2>
-        <input type="email" id="registerEmail" placeholder="Email"><br><br>
-        <input type="password" id="registerPassword" placeholder="Password"><br><br>
-        <button onclick="register()">Register</button><br><br>
+        <input type="text" id="registerUsername" placeholder="Username"><br>
+        <input type="email" id="registerEmail" placeholder="Email"><br>
+        <input type="password" id="registerPassword" placeholder="Password"><br>
+        <button onclick="register()">Register</button>
 
         <h2>Login</h2>
-        <input type="email" id="loginEmail" placeholder="Email"><br><br>
-        <input type="password" id="loginPassword" placeholder="Password"><br><br>
-        <button onclick="login()">Login</button><br><br>
+        <input type="email" id="loginEmail" placeholder="Email"><br>
+        <input type="password" id="loginPassword" placeholder="Password"><br>
+        <button onclick="login()">Login</button>
+
+        <button id="googleSignInBtn" onclick="googleSignIn()">Sign in with Google</button>
     </div>
 
     <!-- Form to send message and upload image, visible only when logged in -->
-    <div id="messageSection" style="display:none;">
-        <textarea id="messageInput" placeholder="Enter your message..." rows="5" cols="30"></textarea><br><br>
-        <input type="file" id="imageInput" accept="image/*"><br><br>
+    <div id="messageSection">
+        <textarea id="messageInput" placeholder="Enter your message..." rows="5"></textarea><br>
+        <input type="file" id="imageInput" accept="image/*"><br>
         <button onclick="sendMessage()">Send</button>
         <button onclick="logout()">Logout</button>
         <h2>Messages</h2>
@@ -57,15 +126,34 @@
         const database = firebase.database();
         const storage = firebase.storage();
         const auth = firebase.auth();
+        const firestore = firebase.firestore();
 
-        // Register new user
-        function register() {
+        // Register new user with unique username
+        async function register() {
+            const username = document.getElementById('registerUsername').value;
             const email = document.getElementById('registerEmail').value;
             const password = document.getElementById('registerPassword').value;
 
+            // Check if the username is unique
+            const usernameDoc = await firestore.collection('usernames').doc(username).get();
+            if (usernameDoc.exists) {
+                alert('Username is already taken!');
+                return;
+            }
+
+            // Create user
             auth.createUserWithEmailAndPassword(email, password)
-                .then(userCredential => {
+                .then(async userCredential => {
+                    const userId = userCredential.user.uid;
+                    
+                    // Save username in Firestore
+                    await firestore.collection('usernames').doc(username).set({ userId });
+
+                    // Save user info in Firestore
+                    await firestore.collection('users').doc(userId).set({ username, email });
+
                     alert('Registration successful!');
+                    document.getElementById('registerUsername').value = '';
                     document.getElementById('registerEmail').value = '';
                     document.getElementById('registerPassword').value = '';
                 })
@@ -90,6 +178,34 @@
                 });
         }
 
+        // Google Sign-In
+        function googleSignIn() {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            auth.signInWithPopup(provider)
+                .then(async (result) => {
+                    const user = result.user;
+                    const userId = user.uid;
+                    const username = user.displayName;
+
+                    // Check if username is unique
+                    const usernameDoc = await firestore.collection('usernames').doc(username).get();
+                    if (!usernameDoc.exists) {
+                        // Save username in Firestore
+                        await firestore.collection('usernames').doc(username).set({ userId });
+
+                        // Save user info in Firestore
+                        await firestore.collection('users').doc(userId).set({ username, email: user.email });
+                    }
+
+                    document.getElementById('authSection').style.display = 'none';
+                    document.getElementById('messageSection').style.display = 'block';
+                    loadMessages(); // Load messages after login
+                })
+                .catch(error => {
+                    alert('Error: ' + error.message);
+                });
+        }
+
         // Logout user
         function logout() {
             auth.signOut().then(() => {
@@ -101,35 +217,37 @@
         }
 
         // Send a message or image
-        function sendMessage() {
+        async function sendMessage() {
             const userId = auth.currentUser.uid;
+            const userDoc = await firestore.collection('users').doc(userId).get();
+            const username = userDoc.data().username;
+
             const message = document.getElementById('messageInput').value;
             const imageInput = document.getElementById('imageInput');
             const imageFile = imageInput.files[0];
 
+            let messageData = {
+                userId: userId,
+                username: username,
+                message: message,
+                timestamp: Date.now()
+            };
+
             if (imageFile) {
                 // Upload image to Firebase Storage
                 const storageRef = storage.ref('images/' + imageFile.name);
-                storageRef.put(imageFile).then((snapshot) => {
-                    // Get image URL after upload
-                    snapshot.ref.getDownloadURL().then((url) => {
-                        // Save message with image URL to the database
-                        messagesRef.push({
-                            userId: userId,
-                            message: message,
-                            imageUrl: url,
-                            timestamp: Date.now()
-                        });
-                    });
-                });
-            } else {
-                // Save message without image to the database
-                messagesRef.push({
-                    userId: userId,
-                    message: message,
-                    timestamp: Date.now()
-                });
+                const snapshot = await storageRef.put(imageFile);
+                const imageUrl = await snapshot.ref.getDownloadURL();
+
+                // Add image URL to message data
+                messageData.imageUrl = imageUrl;
             }
+
+            // Save message to Realtime Database
+            messagesRef.push(messageData);
+
+            // Log message in Firestore
+            await firestore.collection('userLogs').doc(userId).collection('logs').add(messageData);
 
             // Clear the input fields
             document.getElementById('messageInput').value = '';
@@ -152,9 +270,9 @@
                     const messageElement = document.createElement('div');
                     messageElement.style.marginBottom = '20px';
 
-                    if (childData.message) {
+                    if (childData.username && childData.message) {
                         const messageText = document.createElement('p');
-                        messageText.textContent = `User ${childData.userId}: ${childData.message}`;
+                        messageText.textContent = `${childData.username}: ${childData.message}`;
                         messageElement.appendChild(messageText);
                     }
 
