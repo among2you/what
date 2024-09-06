@@ -127,22 +127,25 @@
     </div>
 
     <script>
-        const firebaseConfig = {
-            apiKey: "AIzaSyBFLQzHxVw5UV1481iRfruD9AEenf_M_lI",
-            authDomain: "realtime-sync-project.firebaseapp.com",
-            databaseURL: "https://realtime-sync-project-default-rtdb.firebaseio.com",
-            projectId: "realtime-sync-project",
-            storageBucket: "realtime-sync-project.appspot.com",
-            messagingSenderId: "1079348282119",
-            appId: "1:1079348282119:web:57d72c95e6212070fe7ba2",
-            measurementId: "G-XKVNBVD6RE"
-        };
+    const firebaseConfig = {
+        apiKey: "AIzaSyBFLQzHxVw5UV1481iRfruD9AEenf_M_lI",
+        authDomain: "realtime-sync-project.firebaseapp.com",
+        databaseURL: "https://realtime-sync-project-default-rtdb.firebaseio.com",
+        projectId: "realtime-sync-project",
+        storageBucket: "realtime-sync-project.appspot.com",
+        messagingSenderId: "1079348282119",
+        appId: "1:1079348282119:web:57d72c95e6212070fe7ba2",
+        measurementId: "G-XKVNBVD6RE"
+    };
 
-        firebase.initializeApp(firebaseConfig);
-        const database = firebase.database();
-        const storage = firebase.storage();
-        const auth = firebase.auth();
-        const firestore = firebase.firestore();
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    
+    // Initialize Firebase Services
+    const auth = firebase.auth();
+    const firestore = firebase.firestore();
+    const database = firebase.database();
+    const storage = firebase.storage();
 
         let currentUserId = null;
         let selectedFriendId = null;
