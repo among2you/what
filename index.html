@@ -87,6 +87,14 @@
             background-color: #cbd5e0;
         }
     </style>
+    <!-- Firebase SDK scripts -->
+    <script src="https://www.gstatic.com/firebasejs/9.1.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.1.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.1.0/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.1.0/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.1.0/firebase-storage.js"></script>
+    <!-- Add a favicon placeholder -->
+    <link rel="icon" href="data:;base64,=">
 </head>
 <body>
     <h1>Friend Chat</h1>
@@ -126,26 +134,31 @@
         <button onclick="logout()">Logout</button>
     </div>
 
-    <script>
-    const firebaseConfig = {
-        apiKey: "AIzaSyBFLQzHxVw5UV1481iRfruD9AEenf_M_lI",
-        authDomain: "realtime-sync-project.firebaseapp.com",
-        databaseURL: "https://realtime-sync-project-default-rtdb.firebaseio.com",
-        projectId: "realtime-sync-project",
-        storageBucket: "realtime-sync-project.appspot.com",
-        messagingSenderId: "1079348282119",
-        appId: "1:1079348282119:web:57d72c95e6212070fe7ba2",
-        measurementId: "G-XKVNBVD6RE"
-    };
+    <script type="module">
+        // Firebase v9 Modular SDK
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.1.0/firebase-app.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/9.1.0/firebase-auth.js";
+        import { getFirestore, collection, doc, getDoc, setDoc, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.1.0/firebase-firestore.js";
+        import { getDatabase, ref, push, onValue } from "https://www.gstatic.com/firebasejs/9.1.0/firebase-database.js";
+        import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.1.0/firebase-storage.js";
 
-    // Initialize Firebase
-    firebase.initializeApp(firebaseConfig);
-    
-    // Initialize Firebase Services
-    const auth = firebase.auth();
-    const firestore = firebase.firestore();
-    const database = firebase.database();
-    const storage = firebase.storage();
+        // Initialize Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyBFLQzHxVw5UV1481iRfruD9AEenf_M_lI",
+            authDomain: "realtime-sync-project.firebaseapp.com",
+            databaseURL: "https://realtime-sync-project-default-rtdb.firebaseio.com",
+            projectId: "realtime-sync-project",
+            storageBucket: "realtime-sync-project.appspot.com",
+            messagingSenderId: "1079348282119",
+            appId: "1:1079348282119:web:57d72c95e6212070fe7ba2",
+            measurementId: "G-XKVNBVD6RE"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const firestore = getFirestore(app);
+        const database = getDatabase(app);
+        const storage = getStorage(app);
 
         let currentUserId = null;
         let selectedFriendId = null;
@@ -155,17 +168,17 @@
             const email = document.getElementById('registerEmail').value;
             const password = document.getElementById('registerPassword').value;
 
-            const usernameDoc = await firestore.collection('usernames').doc(username).get();
-            if (usernameDoc.exists) {
+            const usernameDoc = await getDoc(doc(firestore, 'usernames', username));
+            if (usernameDoc.exists()) {
                 alert('Username is already taken!');
                 return;
             }
 
-            auth.createUserWithEmailAndPassword(email, password)
-                .then(async userCredential => {
+            createUserWithEmailAndPassword(auth, email, password)
+                .then(async (userCredential) => {
                     const userId = userCredential.user.uid;
-                    await firestore.collection('usernames').doc(username).set({ userId });
-                    await firestore.collection('users').doc(userId).set({ username, email });
+                    await setDoc(doc(firestore, 'usernames', username), { userId });
+                    await setDoc(doc(firestore, 'users', userId), { username, email });
                     alert('Registration successful!');
                 })
                 .catch(error => alert('Error: ' + error.message));
@@ -175,8 +188,8 @@
             const email = document.getElementById('loginEmail').value;
             const password = document.getElementById('loginPassword').value;
 
-            auth.signInWithEmailAndPassword(email, password)
-                .then(userCredential => {
+            signInWithEmailAndPassword(auth, email, password)
+                .then((userCredential) => {
                     currentUserId = userCredential.user.uid;
                     loadFriends();
                     document.getElementById('authSection').style.display = 'none';
@@ -186,17 +199,17 @@
         }
 
         function googleSignIn() {
-            const provider = new firebase.auth.GoogleAuthProvider();
-            auth.signInWithPopup(provider)
-                .then(async result => {
+            const provider = new GoogleAuthProvider();
+            signInWithPopup(auth, provider)
+                .then(async (result) => {
                     const user = result.user;
                     currentUserId = user.uid;
                     const username = user.displayName;
 
-                    const usernameDoc = await firestore.collection('usernames').doc(username).get();
-                    if (!usernameDoc.exists) {
-                        await firestore.collection('usernames').doc(username).set({ userId: currentUserId });
-                        await firestore.collection('users').doc(currentUserId).set({ username, email: user.email });
+                    const usernameDoc = await getDoc(doc(firestore, 'usernames', username));
+                    if (!usernameDoc.exists()) {
+                        await setDoc(doc(firestore, 'usernames', username), { userId: currentUserId });
+                        await setDoc(doc(firestore, 'users', currentUserId), { username, email: user.email });
                     }
 
                     loadFriends();
@@ -207,107 +220,90 @@
         }
 
         function logout() {
-            auth.signOut().then(() => {
+            signOut(auth).then(() => {
                 document.getElementById('authSection').style.display = 'block';
                 document.getElementById('chatSection').style.display = 'none';
-            }).catch(error => alert('Error: ' + error.message));
+                currentUserId = null;
+            });
         }
 
         async function addFriend() {
             const friendEmail = document.getElementById('friendEmail').value;
-            const friendQuery = await firestore.collection('users').where('email', '==', friendEmail).get();
+            const q = query(collection(firestore, 'users'), where('email', '==', friendEmail));
+            const querySnapshot = await getDocs(q);
 
-            if (friendQuery.empty) {
-                alert('No user found with that email!');
-                return;
+            if (!querySnapshot.empty) {
+                const friend = querySnapshot.docs[0];
+                const friendId = friend.id;
+                await setDoc(doc(firestore, `users/${currentUserId}/friends`, friendId), {});
+                await setDoc(doc(firestore, `users/${friendId}/friends`, currentUserId), {});
+                loadFriends();
+            } else {
+                alert('Friend not found!');
             }
-
-            const friendId = friendQuery.docs[0].id;
-            await firestore.collection('users').doc(currentUserId).collection('friends').doc(friendId).set({});
-            loadFriends();
         }
 
         async function loadFriends() {
-            const friendsRef = firestore.collection('users').doc(currentUserId).collection('friends');
-            const friendsListDiv = document.getElementById('friendsList');
-            friendsListDiv.innerHTML = '';
+            const friendsList = document.getElementById('friendsList');
+            friendsList.innerHTML = '';
 
-            const friendsSnapshot = await friendsRef.get();
-            friendsSnapshot.forEach(async doc => {
-                const friendId = doc.id;
-                const friendDoc = await firestore.collection('users').doc(friendId).get();
+            const friendsRef = collection(firestore, `users/${currentUserId}/friends`);
+            const friendsSnapshot = await getDocs(friendsRef);
+
+            friendsSnapshot.forEach(async (docSnapshot) => {
+                const friendId = docSnapshot.id;
+                const friendDoc = await getDoc(doc(firestore, 'users', friendId));
                 const friendData = friendDoc.data();
-
                 const friendDiv = document.createElement('div');
-                friendDiv.textContent = friendData.username;
+                friendDiv.innerHTML = friendData.username;
                 friendDiv.onclick = () => selectFriend(friendId);
-                friendsListDiv.appendChild(friendDiv);
+                friendsList.appendChild(friendDiv);
             });
         }
 
         function selectFriend(friendId) {
             selectedFriendId = friendId;
-            loadMessages(friendId);
             document.getElementById('chatWindow').style.display = 'block';
+            loadMessages();
         }
 
-        async function sendMessage() {
-            const message = document.getElementById('messageInput').value;
-            const imageInput = document.getElementById('imageInput');
-            const imageFile = imageInput.files[0];
+        function loadMessages() {
+            const messagesRef = ref(database, `messages/${currentUserId}/${selectedFriendId}`);
+            onValue(messagesRef, (snapshot) => {
+                const messagesDiv = document.getElementById('messages');
+                messagesDiv.innerHTML = '';
+                snapshot.forEach((childSnapshot) => {
+                    const messageData = childSnapshot.val();
+                    const messageDiv = document.createElement('div');
+                    messageDiv.className = messageData.sender === currentUserId ? 'message user' : 'message friend';
+                    messageDiv.innerHTML = messageData.text || `<img src="${messageData.imageUrl}" />`;
+                    messagesDiv.appendChild(messageDiv);
+                });
+            });
+        }
 
-            const messageData = {
-                userId: currentUserId,
-                friendId: selectedFriendId,
-                message: message,
-                timestamp: Date.now()
-            };
+        function sendMessage() {
+            const messageInput = document.getElementById('messageInput').value;
+            const imageInput = document.getElementById('imageInput').files[0];
 
-            if (imageFile) {
-                const storageRef = storage.ref('images/' + imageFile.name);
-                const snapshot = await storageRef.put(imageFile);
-                const imageUrl = await snapshot.ref.getDownloadURL();
-                messageData.imageUrl = imageUrl;
+            if (imageInput) {
+                const imageRef = storageRef(storage, `images/${Date.now()}_${imageInput.name}`);
+                uploadBytes(imageRef, imageInput).then(snapshot => {
+                    getDownloadURL(snapshot.ref).then(downloadURL => {
+                        pushMessage({ imageUrl: downloadURL });
+                    });
+                });
+            } else {
+                pushMessage({ text: messageInput });
             }
 
-            const messagesRef = database.ref('chats/' + currentUserId + '/' + selectedFriendId);
-            messagesRef.push(messageData);
             document.getElementById('messageInput').value = '';
             document.getElementById('imageInput').value = '';
         }
 
-        function loadMessages(friendId) {
-            const messagesRef = database.ref('chats/' + currentUserId + '/' + friendId);
-            messagesRef.on('value', snapshot => {
-                const messagesDiv = document.getElementById('messages');
-                messagesDiv.innerHTML = '';
-
-                snapshot.forEach(childSnapshot => {
-                    const messageData = childSnapshot.val();
-                    const messageElement = document.createElement('div');
-                    messageElement.classList.add('message');
-
-                    if (messageData.userId === currentUserId) {
-                        messageElement.classList.add('user');
-                    } else {
-                        messageElement.classList.add('friend');
-                    }
-
-                    if (messageData.message) {
-                        const messageText = document.createElement('p');
-                        messageText.textContent = messageData.message;
-                        messageElement.appendChild(messageText);
-                    }
-
-                    if (messageData.imageUrl) {
-                        const messageImage = document.createElement('img');
-                        messageImage.src = messageData.imageUrl;
-                        messageElement.appendChild(messageImage);
-                    }
-
-                    messagesDiv.appendChild(messageElement);
-                });
-            });
+        function pushMessage(data) {
+            const messagesRef = ref(database, `messages/${currentUserId}/${selectedFriendId}`);
+            push(messagesRef, { sender: currentUserId, ...data });
         }
     </script>
 </body>
