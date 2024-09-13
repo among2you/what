@@ -3,10 +3,144 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Back4app Messaging App</title>
-    <script src="https://npmcdn.com/parse/dist/parse.min.js"></script>
+    <title>WhatsApp-like Messaging App</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-storage.js"></script>
     <style>
-        /* ... (previous CSS remains unchanged) ... */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+        body {
+            display: flex;
+            height: 100vh;
+            background-color: #f0f2f5;
+        }
+        .sidebar {
+            width: 30%;
+            background-color: #ffffff;
+            border-right: 1px solid #e0e0e0;
+            display: flex;
+            flex-direction: column;
+        }
+        .profile-section {
+            padding: 20px;
+            background-color: #ededed;
+            color: #333;
+        }
+        .search-bar {
+            padding: 10px;
+        }
+        #searchInput {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 20px;
+            background-color: #f0f2f5;
+        }
+        .friendsList {
+            flex-grow: 1;
+            overflow-y: auto;
+        }
+        .friendsList div {
+            padding: 15px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f2f5;
+        }
+        .friendsList div:hover {
+            background-color: #f5f5f5;
+        }
+        .chat-window {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        .chat-header {
+            padding: 20px;
+            background-color: #ededed;
+            color: #333;
+            font-weight: bold;
+        }
+        .messages {
+            flex-grow: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background-color: #e5ddd5;
+        }
+        .message {
+            max-width: 60%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            clear: both;
+        }
+        .message.user {
+            float: right;
+            background-color: #dcf8c6;
+        }
+        .message.friend {
+            float: left;
+            background-color: #ffffff;
+        }
+        .chat-footer {
+            padding: 10px;
+            background-color: #f0f2f5;
+            display: flex;
+            align-items: center;
+        }
+        #messageInput {
+            flex-grow: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 20px;
+            margin-right: 10px;
+        }
+        .image-upload-label {
+            cursor: pointer;
+            font-size: 24px;
+            margin-right: 10px;
+        }
+        #imageInput {
+            display: none;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #128C7E;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+        }
+        .login-buttons {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+        .login-buttons button {
+            margin-bottom: 10px;
+        }
+        #loginForm, #signupForm {
+            padding: 20px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        #loginForm input, #signupForm input {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
     </style>
 </head>
 <body>
@@ -30,6 +164,8 @@
         <div class="login-buttons">
             <button onclick="showLoginForm()">Login</button>
             <button onclick="showSignupForm()">Sign Up</button>
+            <button onclick="loginWithGoogle()">Login with Google</button>
+            <button onclick="loginWithGithub()">Login with GitHub</button>
             <button onclick="logout()" id="logoutButton" style="display: none;">Logout</button>
         </div>
     </div>
@@ -54,7 +190,7 @@
 
     <!-- Login Form -->
     <div id="loginForm" style="display: none;">
-        <input type="text" id="loginUsername" placeholder="Username">
+        <input type="email" id="loginEmail" placeholder="Email">
         <input type="password" id="loginPassword" placeholder="Password">
         <button onclick="login()">Login</button>
     </div>
@@ -68,9 +204,20 @@
     </div>
 
     <script>
-        // Initialize Parse with your credentials
-        Parse.initialize("RBcV0nxkkAb1m2pnQe4zuwY7gO6KveMff7i5miZ5", "y8ktwKg2KpEhndlM70fAh32vSjh08hmevvm1MCqp");
-        Parse.serverURL = 'https://parseapi.back4app.com/';
+        // Initialize Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyBFLQzHxVw5UV1481iRfruD9AEenf_M_lI",
+            authDomain: "realtime-sync-project.firebaseapp.com",
+            databaseURL: "https://realtime-sync-project-default-rtdb.firebaseio.com",
+            projectId: "realtime-sync-project",
+            storageBucket: "realtime-sync-project.appspot.com",
+            messagingSenderId: "1079348282119",
+            appId: "1:1079348282119:web:57d72c95e6212070fe7ba2",
+            measurementId: "G-XKVNBVD6RE"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
 
         let currentUser = null;
         let currentChatId = null;
@@ -86,10 +233,11 @@
         }
 
         async function login() {
-            const username = document.getElementById('loginUsername').value;
+            const email = document.getElementById('loginEmail').value;
             const password = document.getElementById('loginPassword').value;
             try {
-                currentUser = await Parse.User.logIn(username, password);
+                const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
+                currentUser = userCredential.user;
                 handleLogin(currentUser);
                 document.getElementById('loginForm').style.display = 'none';
             } catch (error) {
@@ -97,17 +245,39 @@
             }
         }
 
+        async function loginWithGoogle() {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            try {
+                const result = await firebase.auth().signInWithPopup(provider);
+                currentUser = result.user;
+                handleLogin(currentUser);
+            } catch (error) {
+                console.error("Error during Google sign in:", error);
+            }
+        }
+
+        async function loginWithGithub() {
+            const provider = new firebase.auth.GithubAuthProvider();
+            try {
+                const result = await firebase.auth().signInWithPopup(provider);
+                currentUser = result.user;
+                handleLogin(currentUser);
+            } catch (error) {
+                console.error("Error during GitHub sign in:", error);
+            }
+        }
+
         async function signup() {
             const username = document.getElementById('signupUsername').value;
             const email = document.getElementById('signupEmail').value;
             const password = document.getElementById('signupPassword').value;
-            const user = new Parse.User();
-            user.set('username', username);
-            user.set('email', email);
-            user.set('password', password);
             try {
-                await user.signUp();
-                currentUser = user;
+                const userCredential = await firebase.auth().createUserWithEmailAndPassword(email, password);
+                currentUser = userCredential.user;
+                await firebase.database().ref('users/' + currentUser.uid).set({
+                    username: username,
+                    email: email
+                });
                 handleLogin(currentUser);
                 document.getElementById('signupForm').style.display = 'none';
             } catch (error) {
@@ -117,74 +287,62 @@
 
         async function logout() {
             try {
-                await Parse.User.logOut();
+                await firebase.auth().signOut();
                 currentUser = null;
                 document.getElementById('userEmail').innerText = 'User Email';
                 document.getElementById('userUsername').innerText = 'Username';
                 document.getElementById('friendsList').innerHTML = '';
                 document.getElementById('messages').innerHTML = '';
                 document.getElementById('logoutButton').style.display = 'none';
-                document.querySelector('.login-buttons').style.display = 'block';
+                document.querySelector('.login-buttons').style.display = 'flex';
             } catch (error) {
                 console.error('Logout Error:', error);
             }
         }
 
         function handleLogin(user) {
-            document.getElementById('userEmail').innerText = user.get('email');
-            document.getElementById('userUsername').innerText = user.get('username');
-            document.getElementById('logoutButton').style.display = 'block';
-            document.querySelector('.login-buttons').style.display = 'none';
-            loadFriends();
+            firebase.database().ref('users/' + user.uid).once('value', (snapshot) => {
+                const userData = snapshot.val();
+                document.getElementById('userEmail').innerText = user.email;
+                document.getElementById('userUsername').innerText = userData ? userData.username : user.displayName || 'Anonymous';
+                document.getElementById('logoutButton').style.display = 'block';
+                document.querySelector('.login-buttons').style.display = 'none';
+                loadFriends();
+            });
         }
 
-        async function loadFriends() {
-            const query = new Parse.Query(Parse.User);
-            query.notEqualTo('objectId', currentUser.id);
-            try {
-                const friends = await query.find();
+        function loadFriends() {
+            firebase.database().ref('users').on('value', (snapshot) => {
+                const users = snapshot.val();
                 const friendsList = document.getElementById('friendsList');
                 friendsList.innerHTML = '';
-                friends.forEach((friend) => {
-                    const friendDiv = document.createElement('div');
-                    friendDiv.innerText = friend.get('username');
-                    friendDiv.onclick = () => startChat(friend.id, friend.get('username'));
-                    friendsList.appendChild(friendDiv);
-                });
-            } catch (error) {
-                console.error('Error loading friends:', error);
-            }
+                for (let userId in users) {
+                    if (userId !== currentUser.uid) {
+                        const friendDiv = document.createElement('div');
+                        friendDiv.innerText = users[userId].username || 'Anonymous';
+                        friendDiv.onclick = () => startChat(userId, users[userId].username || 'Anonymous');
+                        friendsList.appendChild(friendDiv);
+                    }
+                }
+            });
         }
 
         function startChat(friendId, friendName) {
-            currentChatId = [currentUser.id, friendId].sort().join('_');
+            currentChatId = [currentUser.uid, friendId].sort().join('_');
             document.getElementById('friendUsername').innerText = friendName;
             loadMessages();
         }
 
-        async function loadMessages() {
-            const query = new Parse.Query('Message');
-            query.equalTo('chatId', currentChatId);
-            query.ascending('createdAt');
-            try {
-                const messages = await query.find();
+        function loadMessages() {
+            firebase.database().ref('messages/' + currentChatId).on('value', (snapshot) => {
+                const messages = snapshot.val();
                 const messagesContainer = document.getElementById('messages');
                 messagesContainer.innerHTML = '';
-                messages.forEach((message) => {
-                    displayMessage(message);
-                });
-                // Poll for updates every 5 seconds
-                setInterval(async () => {
-                    const newMessages = await query.find();
-                    newMessages.forEach((message) => {
-                        if (!document.getElementById(message.id)) {
-                            displayMessage(message);
-                        }
-                    });
-                }, 5000);
-            } catch (error) {
-                console.error('Error loading messages:', error);
-            }
+                for (let messageId in messages) {
+                    displayMessage(messages[messageId]);
+                }
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            });
         }
 
         function displayMessage(message) {
@@ -192,19 +350,18 @@
             const messageElement = document.createElement('div');
             messageElement.id = message.id;
             messageElement.classList.add('message');
-            messageElement.classList.add(message.get('senderId') === currentUser.id ? 'user' : 'friend');
+            messageElement.classList.add(message.senderId === currentUser.uid ? 'user' : 'friend');
             
-            if (message.get('type') === 'text') {
-                messageElement.innerText = message.get('content');
-            } else if (message.get('type') === 'image') {
+            if (message.type === 'text') {
+                messageElement.innerText = message.content;
+            } else if (message.type === 'image') {
                 const img = document.createElement('img');
-                img.src = message.get('content').url();
+                img.src = message.content;
                 img.style.maxWidth = '100%';
                 messageElement.appendChild(img);
             }
             
             messagesContainer.appendChild(messageElement);
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
 
         window.sendMessage = async function() {
@@ -225,30 +382,29 @@
         }
 
         async function sendTextMessage(message) {
-            const Message = Parse.Object.extend('Message');
-            const newMessage = new Message();
-            newMessage.set('chatId', currentChatId);
-            newMessage.set('senderId', currentUser.id);
-            newMessage.set('content', message);
-            newMessage.set('type', 'text');
             try {
-                await newMessage.save();
+                await firebase.database().ref('messages/' + currentChatId).push({
+                    senderId: currentUser.uid,
+                    content: message,
+                    type: 'text',
+                    timestamp: firebase.database.ServerValue.TIMESTAMP
+                });
             } catch (error) {
                 console.error('Error sending message:', error);
             }
         }
 
         async function sendImageMessage(file) {
-            const parseFile = new Parse.File(file.name, file);
             try {
-                await parseFile.save();
-                const Message = Parse.Object.extend('Message');
-                const newMessage = new Message();
-                newMessage.set('chatId', currentChatId);
-                newMessage.set('senderId', currentUser.id);
-                newMessage.set('content', parseFile);
-                newMessage.set('type', 'image');
-                await newMessage.save();
+                const storageRef = firebase.storage().ref('images/' + file.name);
+                await storageRef.put(file);
+                const imageUrl = await storageRef.getDownloadURL();
+                await firebase.database().ref('messages/' + currentChatId).push({
+                    senderId: currentUser.uid,
+                    content: imageUrl,
+                    type: 'image',
+                    timestamp: firebase.database.ServerValue.TIMESTAMP
+                });
             } catch (error) {
                 console.error('Error sending image:', error);
             }
@@ -268,11 +424,5 @@
         });
 
         // Check if user is already logged in
-        const currentUser = Parse.User.current();
-        if (currentUser) {
-            handleLogin(currentUser);
-        }
-    </script>
-
-</body>
-</html>
+        firebase.auth().onAuthStateChanged((user) => {
+            if
