@@ -3,208 +3,85 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WhatsApp-like Messaging App</title>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-storage.js"></script>
+    <title>Simple Messaging App</title>
     <style>
-        * {
+        body {
+            font-family: Arial, sans-serif;
             margin: 0;
             padding: 0;
-            box-sizing: border-box;
-            font-family: Arial, sans-serif;
-        }
-        body {
             display: flex;
+            justify-content: center;
+            align-items: center;
             height: 100vh;
             background-color: #f0f2f5;
         }
-        .sidebar {
-            width: 30%;
-            background-color: #ffffff;
-            border-right: 1px solid #e0e0e0;
+        .app {
+            width: 100%;
+            max-width: 800px;
+            height: 600px;
             display: flex;
             flex-direction: column;
-        }
-        .profile-section {
-            padding: 20px;
-            background-color: #ededed;
-            color: #333;
-        }
-        .search-bar {
-            padding: 10px;
-        }
-        #searchInput {
-            width: 100%;
-            padding: 10px;
-            border: none;
-            border-radius: 20px;
-            background-color: #f0f2f5;
-        }
-        .friendsList {
-            flex-grow: 1;
-            overflow-y: auto;
-        }
-        .friendsList div {
-            padding: 15px;
-            cursor: pointer;
-            border-bottom: 1px solid #f0f2f5;
-        }
-        .friendsList div:hover {
-            background-color: #f5f5f5;
+            background-color: white;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
         }
         .chat-window {
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-        }
-        .chat-header {
-            padding: 20px;
-            background-color: #ededed;
-            color: #333;
-            font-weight: bold;
-        }
-        .messages {
-            flex-grow: 1;
-            padding: 20px;
+            flex: 1;
             overflow-y: auto;
+            padding: 20px;
             background-color: #e5ddd5;
         }
         .message {
             max-width: 60%;
-            padding: 10px;
+            padding: 8px 12px;
             margin-bottom: 10px;
-            border-radius: 8px;
-            clear: both;
+            border-radius: 20px;
+            word-wrap: break-word;
         }
-        .message.user {
-            float: right;
+        .message.sent {
             background-color: #dcf8c6;
+            align-self: flex-end;
+            margin-left: auto;
         }
-        .message.friend {
-            float: left;
-            background-color: #ffffff;
+        .message.received {
+            background-color: white;
         }
-        .chat-footer {
-            padding: 10px;
-            background-color: #f0f2f5;
+        .input-area {
             display: flex;
-            align-items: center;
+            padding: 10px;
+            background-color: #f0f0f0;
         }
-        #messageInput {
-            flex-grow: 1;
+        #message-input {
+            flex: 1;
             padding: 10px;
             border: none;
             border-radius: 20px;
             margin-right: 10px;
         }
-        .image-upload-label {
-            cursor: pointer;
-            font-size: 24px;
-            margin-right: 10px;
-        }
-        #imageInput {
-            display: none;
-        }
-        button {
+        #send-button {
             padding: 10px 20px;
-            background-color: #128C7E;
+            background-color: #075e54;
             color: white;
             border: none;
             border-radius: 20px;
             cursor: pointer;
         }
-        .login-buttons {
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-        }
-        .login-buttons button {
-            margin-bottom: 10px;
-        }
-        #loginForm, #signupForm {
-            padding: 20px;
-            background-color: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-        }
-        #loginForm input, #signupForm input {
-            display: block;
-            width: 100%;
-            padding: 10px;
-            margin-bottom: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
     </style>
 </head>
 <body>
-
-    <!-- Sidebar -->
-    <div class="sidebar">
-        <div class="profile-section">
-            <span id="userEmail">User Email</span><br>
-            <span id="userUsername">Username</span>
-        </div>
-
-        <div class="search-bar">
-            <input type="text" id="searchInput" placeholder="Search or start new chat">
-        </div>
-
-        <div id="friendsList" class="friendsList">
-            <!-- List of friends will be dynamically generated -->
-        </div>
-
-        <!-- Buttons for login/signup -->
-        <div class="login-buttons">
-            <button onclick="showLoginForm()">Login</button>
-            <button onclick="showSignupForm()">Sign Up</button>
-            <button onclick="loginWithGoogle()">Login with Google</button>
-            <button onclick="loginWithGithub()">Login with GitHub</button>
-            <button onclick="logout()" id="logoutButton" style="display: none;">Logout</button>
+    <div class="app">
+        <div class="chat-window" id="chat-window"></div>
+        <div class="input-area">
+            <input type="text" id="message-input" placeholder="Type a message...">
+            <button id="send-button">Send</button>
         </div>
     </div>
 
-    <!-- Chat Window -->
-    <div class="chat-window">
-        <div class="chat-header">
-            <span id="friendUsername">Friend's Name</span>
-        </div>
+    <script type="module">
+        // Import the functions you need from the SDKs you need
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
+        import { getDatabase, ref, push, onChildAdded } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
 
-        <div id="messages" class="messages">
-            <!-- Chat messages will be dynamically generated here -->
-        </div>
-
-        <div class="chat-footer">
-            <textarea id="messageInput" placeholder="Type a message"></textarea>
-            <label for="imageInput" class="image-upload-label">📷</label>
-            <input type="file" id="imageInput" accept="image/*">
-            <button onclick="sendMessage()">Send</button>
-        </div>
-    </div>
-
-    <!-- Login Form -->
-    <div id="loginForm" style="display: none;">
-        <input type="email" id="loginEmail" placeholder="Email">
-        <input type="password" id="loginPassword" placeholder="Password">
-        <button onclick="login()">Login</button>
-    </div>
-
-    <!-- Signup Form -->
-    <div id="signupForm" style="display: none;">
-        <input type="text" id="signupUsername" placeholder="Username">
-        <input type="email" id="signupEmail" placeholder="Email">
-        <input type="password" id="signupPassword" placeholder="Password">
-        <button onclick="signup()">Sign Up</button>
-    </div>
-
-    <script>
-        // Initialize Firebase
+        // Your web app's Firebase configuration
         const firebaseConfig = {
             apiKey: "AIzaSyBFLQzHxVw5UV1481iRfruD9AEenf_M_lI",
             authDomain: "realtime-sync-project.firebaseapp.com",
@@ -217,212 +94,45 @@
         };
 
         // Initialize Firebase
-        firebase.initializeApp(firebaseConfig);
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
 
-        let currentUser = null;
-        let currentChatId = null;
+        const chatWindow = document.getElementById('chat-window');
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
 
-        function showLoginForm() {
-            document.getElementById('loginForm').style.display = 'block';
-            document.getElementById('signupForm').style.display = 'none';
-        }
-
-        function showSignupForm() {
-            document.getElementById('loginForm').style.display = 'none';
-            document.getElementById('signupForm').style.display = 'block';
-        }
-
-        async function login() {
-            const email = document.getElementById('loginEmail').value;
-            const password = document.getElementById('loginPassword').value;
-            try {
-                const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
-                currentUser = userCredential.user;
-                handleLogin(currentUser);
-                document.getElementById('loginForm').style.display = 'none';
-            } catch (error) {
-                alert('Login Error: ' + error.message);
-            }
-        }
-
-        async function loginWithGoogle() {
-            const provider = new firebase.auth.GoogleAuthProvider();
-            try {
-                const result = await firebase.auth().signInWithPopup(provider);
-                currentUser = result.user;
-                handleLogin(currentUser);
-            } catch (error) {
-                console.error("Error during Google sign in:", error);
-            }
-        }
-
-        async function loginWithGithub() {
-            const provider = new firebase.auth.GithubAuthProvider();
-            try {
-                const result = await firebase.auth().signInWithPopup(provider);
-                currentUser = result.user;
-                handleLogin(currentUser);
-            } catch (error) {
-                console.error("Error during GitHub sign in:", error);
-            }
-        }
-
-        async function signup() {
-            const username = document.getElementById('signupUsername').value;
-            const email = document.getElementById('signupEmail').value;
-            const password = document.getElementById('signupPassword').value;
-            try {
-                const userCredential = await firebase.auth().createUserWithEmailAndPassword(email, password);
-                currentUser = userCredential.user;
-                await firebase.database().ref('users/' + currentUser.uid).set({
-                    username: username,
-                    email: email
-                });
-                handleLogin(currentUser);
-                document.getElementById('signupForm').style.display = 'none';
-            } catch (error) {
-                alert('Signup Error: ' + error.message);
-            }
-        }
-
-        async function logout() {
-            try {
-                await firebase.auth().signOut();
-                currentUser = null;
-                document.getElementById('userEmail').innerText = 'User Email';
-                document.getElementById('userUsername').innerText = 'Username';
-                document.getElementById('friendsList').innerHTML = '';
-                document.getElementById('messages').innerHTML = '';
-                document.getElementById('logoutButton').style.display = 'none';
-                document.querySelector('.login-buttons').style.display = 'flex';
-            } catch (error) {
-                console.error('Logout Error:', error);
-            }
-        }
-
-        function handleLogin(user) {
-            firebase.database().ref('users/' + user.uid).once('value', (snapshot) => {
-                const userData = snapshot.val();
-                document.getElementById('userEmail').innerText = user.email;
-                document.getElementById('userUsername').innerText = userData ? userData.username : user.displayName || 'Anonymous';
-                document.getElementById('logoutButton').style.display = 'block';
-                document.querySelector('.login-buttons').style.display = 'none';
-                loadFriends();
-            });
-        }
-
-        function loadFriends() {
-            firebase.database().ref('users').on('value', (snapshot) => {
-                const users = snapshot.val();
-                const friendsList = document.getElementById('friendsList');
-                friendsList.innerHTML = '';
-                for (let userId in users) {
-                    if (userId !== currentUser.uid) {
-                        const friendDiv = document.createElement('div');
-                        friendDiv.innerText = users[userId].username || 'Anonymous';
-                        friendDiv.onclick = () => startChat(userId, users[userId].username || 'Anonymous');
-                        friendsList.appendChild(friendDiv);
-                    }
-                }
-            });
-        }
-
-        function startChat(friendId, friendName) {
-            currentChatId = [currentUser.uid, friendId].sort().join('_');
-            document.getElementById('friendUsername').innerText = friendName;
-            loadMessages();
-        }
-
-        function loadMessages() {
-            firebase.database().ref('messages/' + currentChatId).on('value', (snapshot) => {
-                const messages = snapshot.val();
-                const messagesContainer = document.getElementById('messages');
-                messagesContainer.innerHTML = '';
-                for (let messageId in messages) {
-                    displayMessage(messages[messageId]);
-                }
-                messagesContainer.scrollTop = messagesContainer.scrollHeight;
-            });
-        }
-
-        function displayMessage(message) {
-            const messagesContainer = document.getElementById('messages');
+        function addMessageToUI(message, isSent) {
             const messageElement = document.createElement('div');
-            messageElement.id = message.id;
             messageElement.classList.add('message');
-            messageElement.classList.add(message.senderId === currentUser.uid ? 'user' : 'friend');
-            
-            if (message.type === 'text') {
-                messageElement.innerText = message.content;
-            } else if (message.type === 'image') {
-                const img = document.createElement('img');
-                img.src = message.content;
-                img.style.maxWidth = '100%';
-                messageElement.appendChild(img);
-            }
-            
-            messagesContainer.appendChild(messageElement);
+            messageElement.classList.add(isSent ? 'sent' : 'received');
+            messageElement.textContent = message;
+            chatWindow.appendChild(messageElement);
+            chatWindow.scrollTop = chatWindow.scrollHeight;
         }
 
-        window.sendMessage = async function() {
-            const messageInput = document.getElementById('messageInput');
+        sendButton.addEventListener('click', () => {
             const message = messageInput.value.trim();
-            const imageInput = document.getElementById('imageInput');
-            const file = imageInput.files[0];
-
-            if (message || file) {
-                if (file) {
-                    await sendImageMessage(file);
-                } else {
-                    await sendTextMessage(message);
-                }
+            if (message) {
+                const messagesRef = ref(database, 'messages');
+                push(messagesRef, {
+                    text: message,
+                    timestamp: Date.now()
+                });
                 messageInput.value = '';
-                imageInput.value = '';
-            }
-        }
-
-        async function sendTextMessage(message) {
-            try {
-                await firebase.database().ref('messages/' + currentChatId).push({
-                    senderId: currentUser.uid,
-                    content: message,
-                    type: 'text',
-                    timestamp: firebase.database.ServerValue.TIMESTAMP
-                });
-            } catch (error) {
-                console.error('Error sending message:', error);
-            }
-        }
-
-        async function sendImageMessage(file) {
-            try {
-                const storageRef = firebase.storage().ref('images/' + file.name);
-                await storageRef.put(file);
-                const imageUrl = await storageRef.getDownloadURL();
-                await firebase.database().ref('messages/' + currentChatId).push({
-                    senderId: currentUser.uid,
-                    content: imageUrl,
-                    type: 'image',
-                    timestamp: firebase.database.ServerValue.TIMESTAMP
-                });
-            } catch (error) {
-                console.error('Error sending image:', error);
-            }
-        }
-
-        // Search functionality
-        document.getElementById('searchInput').addEventListener('input', function(e) {
-            const searchTerm = e.target.value.toLowerCase();
-            const friendDivs = document.getElementById('friendsList').children;
-            for (let friendDiv of friendDivs) {
-                if (friendDiv.innerText.toLowerCase().includes(searchTerm)) {
-                    friendDiv.style.display = 'block';
-                } else {
-                    friendDiv.style.display = 'none';
-                }
             }
         });
 
-        // Check if user is already logged in
-        firebase.auth().onAuthStateChanged((user) => {
-            if
+        messageInput.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter') {
+                sendButton.click();
+            }
+        });
+
+        const messagesRef = ref(database, 'messages');
+        onChildAdded(messagesRef, (snapshot) => {
+            const message = snapshot.val();
+            addMessageToUI(message.text, Math.random() < 0.5);  // Randomly decide if message is sent or received
+        });
+    </script>
+</body>
+</html>
