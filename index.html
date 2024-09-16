@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simple Messaging App</title>
+    <title>Advanced Messaging App</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -12,7 +12,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
+            min-height: 100vh;
             background-color: #f0f2f5;
         }
         .app {
@@ -24,11 +24,32 @@
             background-color: white;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
         }
-        .chat-window {
+        .page {
+            display: none;
+            padding: 20px;
+            flex-direction: column;
+        }
+        .page.active {
+            display: flex;
+        }
+        .nav {
+            display: flex;
+            justify-content: space-around;
+            padding: 10px;
+            background-color: #075e54;
+        }
+        .nav button {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+        }
+        .chat-list, .friend-requests, .messages {
             flex: 1;
             overflow-y: auto;
-            padding: 20px;
-            background-color: #e5ddd5;
+            border: 1px solid #e0e0e0;
+            margin-bottom: 10px;
+            padding: 10px;
         }
         .message {
             max-width: 60%;
@@ -43,43 +64,79 @@
             margin-left: auto;
         }
         .message.received {
-            background-color: white;
+            background-color: #e5ddd5;
         }
         .input-area {
             display: flex;
             padding: 10px;
             background-color: #f0f0f0;
         }
-        #message-input {
+        input[type="text"], input[type="password"], input[type="email"] {
             flex: 1;
             padding: 10px;
-            border: none;
-            border-radius: 20px;
-            margin-right: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
         }
-        #send-button {
+        button {
             padding: 10px 20px;
             background-color: #075e54;
             color: white;
             border: none;
-            border-radius: 20px;
+            border-radius: 4px;
             cursor: pointer;
+        }
+        .google-btn {
+            background-color: #4285F4;
         }
     </style>
 </head>
 <body>
     <div class="app">
-        <div class="chat-window" id="chat-window"></div>
-        <div class="input-area">
-            <input type="text" id="message-input" placeholder="Type a message...">
-            <button id="send-button">Send</button>
+        <div class="nav">
+            <button onclick="showPage('login')">Login</button>
+            <button onclick="showPage('register')">Register</button>
+            <button onclick="showPage('friends')">Friends</button>
+            <button onclick="showPage('chat')">Chat</button>
+            <button onclick="logout()">Logout</button>
+        </div>
+        <div id="login" class="page">
+            <h2>Login</h2>
+            <input type="email" id="login-email" placeholder="Email">
+            <input type="password" id="login-password" placeholder="Password">
+            <button onclick="login()">Login</button>
+            <button class="google-btn" onclick="googleLogin()">Login with Google</button>
+        </div>
+        <div id="register" class="page">
+            <h2>Register</h2>
+            <input type="text" id="register-username" placeholder="Username">
+            <input type="email" id="register-email" placeholder="Email">
+            <input type="password" id="register-password" placeholder="Password">
+            <button onclick="register()">Register</button>
+        </div>
+        <div id="friends" class="page">
+            <h2>Friends</h2>
+            <input type="text" id="friend-username" placeholder="Friend's username">
+            <button onclick="sendFriendRequest()">Send Friend Request</button>
+            <h3>Friend Requests</h3>
+            <div id="friend-requests" class="friend-requests"></div>
+        </div>
+        <div id="chat" class="page">
+            <h2>Chat</h2>
+            <div id="chat-list" class="chat-list"></div>
+            <div id="messages" class="messages"></div>
+            <div class="input-area">
+                <input type="text" id="message-input" placeholder="Type a message...">
+                <button onclick="sendMessage()">Send</button>
+            </div>
         </div>
     </div>
 
     <script type="module">
         // Import the functions you need from the SDKs you need
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
-        import { getDatabase, ref, push, onChildAdded } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
+        import { getDatabase, ref, push, onChildAdded, set, get } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
 
         // Your web app's Firebase configuration
         const firebaseConfig = {
@@ -95,44 +152,175 @@
 
         // Initialize Firebase
         const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
         const database = getDatabase(app);
+        const provider = new GoogleAuthProvider();
 
-        const chatWindow = document.getElementById('chat-window');
-        const messageInput = document.getElementById('message-input');
-        const sendButton = document.getElementById('send-button');
+        let currentUser = null;
+        let selectedFriend = null;
 
-        function addMessageToUI(message, isSent) {
-            const messageElement = document.createElement('div');
-            messageElement.classList.add('message');
-            messageElement.classList.add(isSent ? 'sent' : 'received');
-            messageElement.textContent = message;
-            chatWindow.appendChild(messageElement);
-            chatWindow.scrollTop = chatWindow.scrollHeight;
+        window.showPage = function(pageId) {
+            document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
+            document.getElementById(pageId).classList.add('active');
         }
 
-        sendButton.addEventListener('click', () => {
-            const message = messageInput.value.trim();
-            if (message) {
-                const messagesRef = ref(database, 'messages');
-                push(messagesRef, {
-                    text: message,
-                    timestamp: Date.now()
+        window.register = function() {
+            const username = document.getElementById('register-username').value;
+            const email = document.getElementById('register-email').value;
+            const password = document.getElementById('register-password').value;
+
+            createUserWithEmailAndPassword(auth, email, password)
+                .then((userCredential) => {
+                    const user = userCredential.user;
+                    set(ref(database, 'users/' + user.uid), {
+                        username: username,
+                        email: email
+                    });
+                    alert('Registration successful!');
+                    showPage('login');
+                })
+                .catch((error) => {
+                    alert('Registration failed: ' + error.message);
+                });
+        }
+
+        window.login = function() {
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+
+            signInWithEmailAndPassword(auth, email, password)
+                .then((userCredential) => {
+                    currentUser = userCredential.user;
+                    showPage('friends');
+                })
+                .catch((error) => {
+                    alert('Login failed: ' + error.message);
+                });
+        }
+
+        window.googleLogin = function() {
+            signInWithPopup(auth, provider)
+                .then((result) => {
+                    currentUser = result.user;
+                    showPage('friends');
+                }).catch((error) => {
+                    alert('Google login failed: ' + error.message);
+                });
+        }
+
+        window.logout = function() {
+            signOut(auth).then(() => {
+                currentUser = null;
+                showPage('login');
+            }).catch((error) => {
+                alert('Logout failed: ' + error.message);
+            });
+        }
+
+        window.sendFriendRequest = function() {
+            const friendUsername = document.getElementById('friend-username').value;
+            get(ref(database, 'users')).then((snapshot) => {
+                const users = snapshot.val();
+                const friendUid = Object.keys(users).find(uid => users[uid].username === friendUsername);
+                if (friendUid) {
+                    push(ref(database, 'friendRequests/' + friendUid), {
+                        from: currentUser.uid,
+                        status: 'pending'
+                    });
+                    alert('Friend request sent!');
+                } else {
+                    alert('User not found!');
+                }
+            });
+        }
+
+        function loadFriendRequests() {
+            const requestsDiv = document.getElementById('friend-requests');
+            onChildAdded(ref(database, 'friendRequests/' + currentUser.uid), (snapshot) => {
+                const request = snapshot.val();
+                get(ref(database, 'users/' + request.from)).then((userSnapshot) => {
+                    const user = userSnapshot.val();
+                    const requestElement = document.createElement('div');
+                    requestElement.textContent = `${user.username} sent you a friend request `;
+                    const acceptButton = document.createElement('button');
+                    acceptButton.textContent = 'Accept';
+                    acceptButton.onclick = () => acceptFriendRequest(snapshot.key, request.from);
+                    requestElement.appendChild(acceptButton);
+                    requestsDiv.appendChild(requestElement);
+                });
+            });
+        }
+
+        function acceptFriendRequest(requestId, friendUid) {
+            set(ref(database, 'friends/' + currentUser.uid + '/' + friendUid), true);
+            set(ref(database, 'friends/' + friendUid + '/' + currentUser.uid), true);
+            set(ref(database, 'friendRequests/' + currentUser.uid + '/' + requestId), null);
+            alert('Friend request accepted!');
+            loadFriends();
+        }
+
+        function loadFriends() {
+            const chatList = document.getElementById('chat-list');
+            chatList.innerHTML = '';
+            get(ref(database, 'friends/' + currentUser.uid)).then((snapshot) => {
+                const friends = snapshot.val();
+                for (let friendUid in friends) {
+                    get(ref(database, 'users/' + friendUid)).then((userSnapshot) => {
+                        const user = userSnapshot.val();
+                        const friendElement = document.createElement('div');
+                        friendElement.textContent = user.username;
+                        friendElement.onclick = () => selectFriend(friendUid);
+                        chatList.appendChild(friendElement);
+                    });
+                }
+            });
+        }
+
+        function selectFriend(friendUid) {
+            selectedFriend = friendUid;
+            loadMessages();
+        }
+
+        function loadMessages() {
+            const messagesDiv = document.getElementById('messages');
+            messagesDiv.innerHTML = '';
+            const chatId = [currentUser.uid, selectedFriend].sort().join('-');
+            onChildAdded(ref(database, 'messages/' + chatId), (snapshot) => {
+                const message = snapshot.val();
+                const messageElement = document.createElement('div');
+                messageElement.classList.add('message');
+                messageElement.classList.add(message.from === currentUser.uid ? 'sent' : 'received');
+                messageElement.textContent = message.text;
+                messagesDiv.appendChild(messageElement);
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            });
+        }
+
+        window.sendMessage = function() {
+            const messageInput = document.getElementById('message-input');
+            const message = messageInput.value;
+            if (message && selectedFriend) {
+                const chatId = [currentUser.uid, selectedFriend].sort().join('-');
+                push(ref(database, 'messages/' + chatId), {
+                    from: currentUser.uid,
+                    text: message
                 });
                 messageInput.value = '';
             }
-        });
+        }
 
-        messageInput.addEventListener('keypress', (event) => {
-            if (event.key === 'Enter') {
-                sendButton.click();
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                currentUser = user;
+                loadFriendRequests();
+                loadFriends();
+                showPage('friends');
+            } else {
+                showPage('login');
             }
         });
 
-        const messagesRef = ref(database, 'messages');
-        onChildAdded(messagesRef, (snapshot) => {
-            const message = snapshot.val();
-            addMessageToUI(message.text, Math.random() < 0.5);  // Randomly decide if message is sent or received
-        });
+        showPage('login');
     </script>
 </body>
 </html>
