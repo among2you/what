@@ -93,19 +93,13 @@
 </head>
 <body>
     <div class="app">
-        <div class="nav">
-            <button onclick="showPage('login')">Login</button>
-            <button onclick="showPage('register')">Register</button>
-            <button onclick="showPage('friends')">Friends</button>
-            <button onclick="showPage('chat')">Chat</button>
-            <button onclick="logout()">Logout</button>
-        </div>
         <div id="login" class="page">
             <h2>Login</h2>
             <input type="email" id="login-email" placeholder="Email">
             <input type="password" id="login-password" placeholder="Password">
             <button onclick="login()">Login</button>
             <button class="google-btn" onclick="googleLogin()">Login with Google</button>
+            <p>Don't have an account? <a href="#" onclick="showPage('register')">Register</a></p>
         </div>
         <div id="register" class="page">
             <h2>Register</h2>
@@ -113,21 +107,29 @@
             <input type="email" id="register-email" placeholder="Email">
             <input type="password" id="register-password" placeholder="Password">
             <button onclick="register()">Register</button>
+            <p>Already have an account? <a href="#" onclick="showPage('login')">Login</a></p>
         </div>
-        <div id="friends" class="page">
-            <h2>Friends</h2>
-            <input type="text" id="friend-username" placeholder="Friend's username">
-            <button onclick="sendFriendRequest()">Send Friend Request</button>
-            <h3>Friend Requests</h3>
-            <div id="friend-requests" class="friend-requests"></div>
-        </div>
-        <div id="chat" class="page">
-            <h2>Chat</h2>
-            <div id="chat-list" class="chat-list"></div>
-            <div id="messages" class="messages"></div>
-            <div class="input-area">
-                <input type="text" id="message-input" placeholder="Type a message...">
-                <button onclick="sendMessage()">Send</button>
+        <div id="main" class="page">
+            <div class="nav">
+                <button onclick="showPage('friends')">Friends</button>
+                <button onclick="showPage('chat')">Chat</button>
+                <button onclick="logout()">Logout</button>
+            </div>
+            <div id="friends" class="page">
+                <h2>Friends</h2>
+                <input type="text" id="friend-username" placeholder="Friend's username">
+                <button onclick="sendFriendRequest()">Send Friend Request</button>
+                <h3>Friend Requests</h3>
+                <div id="friend-requests" class="friend-requests"></div>
+            </div>
+            <div id="chat" class="page">
+                <h2>Chat</h2>
+                <div id="chat-list" class="chat-list"></div>
+                <div id="messages" class="messages"></div>
+                <div class="input-area">
+                    <input type="text" id="message-input" placeholder="Type a message...">
+                    <button onclick="sendMessage()">Send</button>
+                </div>
             </div>
         </div>
     </div>
@@ -191,6 +193,7 @@
             signInWithEmailAndPassword(auth, email, password)
                 .then((userCredential) => {
                     currentUser = userCredential.user;
+                    showPage('main');
                     showPage('friends');
                 })
                 .catch((error) => {
@@ -202,6 +205,7 @@
             signInWithPopup(auth, provider)
                 .then((result) => {
                     currentUser = result.user;
+                    showPage('main');
                     showPage('friends');
                 }).catch((error) => {
                     alert('Google login failed: ' + error.message);
@@ -312,9 +316,10 @@
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 currentUser = user;
+                showPage('main');
+                showPage('friends');
                 loadFriendRequests();
                 loadFriends();
-                showPage('friends');
             } else {
                 showPage('login');
             }
